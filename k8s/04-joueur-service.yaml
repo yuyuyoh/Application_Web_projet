@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: joueur-data-pvc
+  namespace: motus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: joueur-service
+  namespace: motus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: joueur-service
+  template:
+    metadata:
+      labels:
+        app: joueur-service
+    spec:
+      containers:
+        - name: joueur-service
+          image: motus/joueur-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+          env:
+            - name: EUREKA_URL
+              value: "http://discovery-service:8761/eureka"
+          volumeMounts:
+            - name: joueur-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 20
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: joueur-data
+          persistentVolumeClaim:
+            claimName: joueur-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: joueur-service
+  namespace: motus
+spec:
+  selector:
+    app: joueur-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+  type: ClusterIP

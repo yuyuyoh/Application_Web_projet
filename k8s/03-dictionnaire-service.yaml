@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dictionnaire-service
+  namespace: motus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dictionnaire-service
+  template:
+    metadata:
+      labels:
+        app: dictionnaire-service
+    spec:
+      containers:
+        - name: dictionnaire-service
+          image: motus/dictionnaire-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          env:
+            - name: EUREKA_URL
+              value: "http://discovery-service:8761/eureka"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 20
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dictionnaire-service
+  namespace: motus
+spec:
+  selector:
+    app: dictionnaire-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+  type: ClusterIP

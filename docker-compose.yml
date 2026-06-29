@@ -1,0 +1,189 @@
+services:
+
+  discovery-service:
+    build: ./discovery-service
+    container_name: discovery-service
+    ports:
+      - "8761:8761"
+    networks:
+      - motus-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  config-service:
+    build: ./config-service
+    container_name: config-service
+    ports:
+      - "8888:8888"
+    environment:
+      - EUREKA_URL=http://discovery-service:8761/eureka
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - motus-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  dictionnaire-service:
+    build: ./dictionnaire-service
+    container_name: dictionnaire-service
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_URL=http://discovery-service:8761/eureka
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - motus-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  joueur-service:
+    build: ./joueur-service
+    container_name: joueur-service
+    ports:
+      - "8081:8081"
+    environment:
+      - EUREKA_URL=http://discovery-service:8761/eureka
+    volumes:
+      - joueur-data:/data
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - motus-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  score-service:
+    build: ./score-service
+    container_name: score-service
+    ports:
+      - "8084:8084"
+    environment:
+      - EUREKA_URL=http://discovery-service:8761/eureka
+    volumes:
+      - score-data:/data
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - motus-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  partie-service:
+    build: ./partie-service
+    container_name: partie-service
+    ports:
+      - "8083:8083"
+    environment:
+      - DICTIONNAIRE_SERVICE_URL=http://dictionnaire-service:8082
+      - SCORE_SERVICE_URL=http://score-service:8084
+      - EUREKA_URL=http://discovery-service:8761/eureka
+    volumes:
+      - partie-data:/data
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      dictionnaire-service:
+        condition: service_healthy
+      score-service:
+        condition: service_healthy
+    networks:
+      - motus-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "8085:8085"
+    environment:
+      - EUREKA_URL=http://discovery-service:8761/eureka
+    volumes:
+      - auth-data:/data
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - motus-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8085/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "3000:80"
+    networks:
+      - motus-network
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - DICTIONNAIRE_SERVICE_URL=http://dictionnaire-service:8082
+      - JOUEUR_SERVICE_URL=http://joueur-service:8081
+      - PARTIE_SERVICE_URL=http://partie-service:8083
+      - SCORE_SERVICE_URL=http://score-service:8084
+      - AUTH_SERVICE_URL=http://auth-service:8085
+      - EUREKA_URL=http://discovery-service:8761/eureka
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      dictionnaire-service:
+        condition: service_healthy
+      joueur-service:
+        condition: service_healthy
+      score-service:
+        condition: service_healthy
+      partie-service:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - motus-network
+
+networks:
+  motus-network:
+    driver: bridge
+
+volumes:
+  joueur-data:
+  score-data:
+  partie-data:
+  auth-data:
